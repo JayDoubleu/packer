@@ -3,10 +3,12 @@ package arm
 import (
 	"context"
 	"fmt"
-
+    "os"
 	"github.com/hashicorp/packer/builder/azure/common/constants"
 	"github.com/hashicorp/packer/helper/multistep"
 	"github.com/hashicorp/packer/packer"
+    "encoding/json"
+    "io/ioutil"
 )
 
 type EndpointType int
@@ -83,11 +85,14 @@ func (s *StepGetIPAddress) Run(ctx context.Context, state multistep.StateBag) mu
 	var resourceGroupName = state.Get(constants.ArmResourceGroupName).(string)
 	var ipAddressName = state.Get(constants.ArmPublicIPAddressName).(string)
 	var nicName = state.Get(constants.ArmNicName).(string)
+	var KeyVaultName = state.Get(constants.ArmKeyVaultName).(string)
+	var ComputeName = state.Get(constants.ArmComputeName).(string)
 
 	s.say(fmt.Sprintf(" -> ResourceGroupName   : '%s'", resourceGroupName))
 	s.say(fmt.Sprintf(" -> PublicIPAddressName : '%s'", ipAddressName))
 	s.say(fmt.Sprintf(" -> NicName             : '%s'", nicName))
 	s.say(fmt.Sprintf(" -> Network Connection  : '%s'", EndpointCommunicationText[s.endpoint]))
+
 
 	address, err := s.get(ctx, resourceGroupName, ipAddressName, nicName)
 	if err != nil {
@@ -99,6 +104,26 @@ func (s *StepGetIPAddress) Run(ctx context.Context, state multistep.StateBag) mu
 
 	state.Put(constants.SSHHost, address)
 	s.say(fmt.Sprintf(" -> IP Address          : '%s'", address))
+    type VmSettings struct {
+            IpAddress string `json:"ip_address"`
+            NicName  string `json:"nic_name"`
+            KeyVaultName  string `json:"keyvault_name"`
+            ComputeName string `json:"compute_name"`
+        }
+    deployment_settings, err := json.Marshal(VmSettings{
+        IpAddress: string(address),
+        NicName:  string(nicName),
+        KeyVaultName:  string(KeyVaultName),
+        ComputeName:  string(ComputeName),
+    })
+    if err != nil {
+        panic(err)
+    }
+
+    file, _ := json.MarshalIndent(string(deployment_settings), "", " ")
+    _ = ioutil.WriteFile(os.Getenv("ARTIFACTSDIRECTORY")+"/packer_deployment.json", file, 0644)
+
+
 
 	return multistep.ActionContinue
 }

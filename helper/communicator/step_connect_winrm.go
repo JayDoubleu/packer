@@ -55,20 +55,13 @@ func (s *StepConnectWinRM) Run(ctx context.Context, state multistep.StateBag) mu
 		// or an interrupt to come through.
 		select {
 		case <-waitDone:
-			if err != nil {
-				ui.Error(fmt.Sprintf("Error waiting for WinRM: %s", err))
-				return multistep.ActionHalt
-			}
-
 			ui.Say("Connected to WinRM!")
 			state.Put("communicator", comm)
 			return multistep.ActionContinue
 		case <-timeout:
-			err := fmt.Errorf("Timeout waiting for WinRM.")
-			state.Put("error", err)
-			ui.Error(err.Error())
-			cancel()
-			return multistep.ActionHalt
+			state.Put("communicator", comm)
+//			return multistep.ActionHalt
+			return multistep.ActionContinue
 		case <-ctx.Done():
 			// The step sequence was cancelled, so cancel waiting for WinRM
 			// and just start the halting process.
